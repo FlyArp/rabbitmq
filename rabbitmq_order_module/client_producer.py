@@ -6,10 +6,23 @@ from rabbitmq_order_module.warehouse import Warehouse
 
 
 class ClientProducer(object):
+    """A client application that allows users to create and send new orders to RabbitMQ.
+
+    This class simulates a client interface where users can select products from
+    an inventory (provided by the Warehouse module) and specify quantities.
+    It then publishes these orders as messages to a RabbitMQ exchange for
+    asynchronous processing by other system components.
+    """
     _order_id = 0
     _user_id_counter = 0
 
     def __init__(self):
+        """Initializes a new ClientProducer instance.
+
+        Assigns a unique user ID to this client, initializes a Warehouse instance
+        to display available products, and establishes a connection to RabbitMQ.
+        It also declares the necessary exchanges for new orders and notifications.
+        """
         ClientProducer._user_id_counter += 1
         self.user_id = ClientProducer._user_id_counter
         self.warehouse = Warehouse()
@@ -22,6 +35,13 @@ class ClientProducer(object):
             self.channel.exchange_declare(exchange='new_orders_exchange', exchange_type='direct')
 
     def collect_order(self):
+        """Guides the user through the process of selecting items for an order.
+
+        Presents available products from the warehouse, prompts the user for
+        choices and quantities, and builds an `order_list`. Once the user
+        finishes, it calls `_send_order` to publish the collected order.
+        Handles user input validation and provides options to finish or cancel.
+        """
         order_list = []
         available_products = self.warehouse.get_inventory()
         product_names = list(available_products.keys())
@@ -62,6 +82,16 @@ class ClientProducer(object):
         self._send_order(order_list)
 
     def _send_order(self, order_list):
+        """Constructs an order message and publishes it to RabbitMQ.
+
+        Increments the global order ID, formats the order details into a JSON
+        string, and publishes it to the 'new_orders_exchange' with an empty
+        routing key. The message is marked as persistent.
+
+        Args:
+            order_list (list): A list of dictionaries, where each dictionary
+                               represents an item in the order with 'name' and 'quantity'.
+        """
         ClientProducer._order_id += 1
 
         order = {
@@ -77,10 +107,13 @@ class ClientProducer(object):
         self.channel.basic_publish(exchange='new_orders_exchange',
                                    routing_key='',
                                    body=body.encode('utf-8'),
-                                   properties=pika.BasicProperties(pika.delivery_mode.DeliveryMode.Persistent)
+                                   properties=pika.BasicProperties(delivery_mode=pika.delivery_mode.DeliveryMode.Persistent,
+                                                                   content_type='application/json',
+                                                                   )
                                    )
 
     def close_connection(self):
+        """Closes the RabbitMQ connection if it is open."""
         try:
             if self.connection and self.connection.is_open:
                 self.connection.close()
@@ -91,3 +124,4 @@ class ClientProducer(object):
 if __name__ == '__main__':
     client = ClientProducer()
     client.collect_order()
+    client.close_connection()
