@@ -6,7 +6,6 @@ from rabbitmq_order_module.warehouse import Warehouse
 
 
 class ClientProducer(object):
-
     _order_id = 0
     _user_id_counter = 0
 
@@ -21,11 +20,6 @@ class ClientProducer(object):
         if ClientProducer._order_id == 1:
             self.channel.exchange_declare(exchange='notification_exchange', exchange_type='topic')
             self.channel.exchange_declare(exchange='new_orders_exchange', exchange_type='direct')
-
-        self.notification_queue = self.channel.queue_declare(queue='', exclusive=True, auto_delete=True)
-        queue_name = self.notification_queue.method.queue
-        self.channel.queue_bind(queue=queue_name, exchange='notification_exchange', routing_key=f'client.{self.user_id}.order.#')
-
 
     def collect_order(self):
         order_list = []
@@ -67,9 +61,6 @@ class ClientProducer(object):
 
         self._send_order(order_list)
 
-
-
-
     def _send_order(self, order_list):
         ClientProducer._order_id += 1
 
@@ -84,10 +75,10 @@ class ClientProducer(object):
         body = json.dumps(order)
 
         self.channel.basic_publish(exchange='new_orders_exchange',
-                              routing_key='',
-                              body=body.encode('utf-8'),
-                              properties=pika.BasicProperties(pika.delivery_mode.DeliveryMode.Persistent)
-                              )
+                                   routing_key='',
+                                   body=body.encode('utf-8'),
+                                   properties=pika.BasicProperties(pika.delivery_mode.DeliveryMode.Persistent)
+                                   )
 
     def close_connection(self):
         try:
@@ -95,6 +86,7 @@ class ClientProducer(object):
                 self.connection.close()
         except Exception as e:
             print(f'Error closing connection. {e}')
+
 
 if __name__ == '__main__':
     client = ClientProducer()
